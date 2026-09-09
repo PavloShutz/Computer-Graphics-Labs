@@ -4,6 +4,7 @@
     <Platform Name="x86" />
   </Configurations>
   <Project Path="../SDL-release-3.4.16/VisualC/SDL/SDL.vcxproj" Id="81ce8daf-ebb2-4761-8e45-b71abcca8c68" />
+  <Project Path="AffineTransformation/AffineTransformation.vcxproj" Id="a34ecb77-9fe2-49ec-b8d2-af5e3b852e53" />
   <Project Path="CircleInterpolation/CircleInterpolation.vcxproj" Id="c4fa3fb8-948a-4d77-a81e-046c28e4d9ad" />
   <Project Path="LagrangeInterpolation/LagrangeInterpolation.vcxproj" Id="5e8964ef-82fd-41c8-9342-ff4f14ee91ce" />
 </Solution>
