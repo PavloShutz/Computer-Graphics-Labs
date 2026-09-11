@@ -341,6 +341,12 @@ ASALocalRun/
 # MSBuild Binary and Structured Log
 *.binlog
 
+# CMake
+build/
+build-*/
+cmake-build-*/
+CMakeUserPresets.json
+
 # NVidia Nsight GPU debugger configuration file
 *.nvuser
 
