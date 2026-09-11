@@ -18,9 +18,11 @@ static SDL_FPoint base_points[] = {
   {450.0f, 440.0f},
   {550.0f, 450.0f}
 };
+#define NUM_BASE_POINTS ((int)SDL_arraysize(base_points))
 
 static SDL_FPoint points[WINDOW_WIDTH];
-static size_t npoints;
+#define MAX_POINTS ((int)SDL_arraysize(points))
+static int npoints;
 
 static SDL_FPoint interpolate(float x);
 
@@ -38,9 +40,21 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
     SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
     return SDL_APP_FAILURE;
   }
-  SDL_SetRenderLogicalPresentation(renderer, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_LOGICAL_PRESENTATION_DISABLED);
+  /* keep the 900x900 drawing area intact when the window is resized. */
+  SDL_SetRenderLogicalPresentation(renderer, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX);
 
-  for (int x = (int)base_points[0].x; x <= (int)base_points[SDL_arraysize(base_points) - 1].x; ++x)
+  /* The Lagrange basis divides by (x_i - x_j), so the nodes must have distinct
+     x values; the sampling loop below additionally assumes they are sorted. */
+  for (int i = 1; i < NUM_BASE_POINTS; ++i) {
+    if (base_points[i].x <= base_points[i - 1].x) {
+      SDL_Log("base_points must be sorted by x with no repeated x values");
+      return SDL_APP_FAILURE;
+    }
+  }
+
+  for (int x = (int)base_points[0].x;
+       x <= (int)base_points[NUM_BASE_POINTS - 1].x && npoints < MAX_POINTS;
+       ++x)
     points[npoints++] = interpolate((float)x);
 
   return SDL_APP_CONTINUE;  /* carry on with the program! */
@@ -64,16 +78,17 @@ SDL_AppResult SDL_AppIterate(void* appstate)
 
   /* draw basic points */
   SDL_SetRenderDrawColor(renderer, 255, 0, 0, SDL_ALPHA_OPAQUE);
-  for (int i = 0; i < SDL_arraysize(base_points); ++i)
+  for (int i = 0; i < NUM_BASE_POINTS; ++i)
   { /* draw red rects around base points for visual */
     SDL_FRect r = { base_points[i].x - 4, base_points[i].y - 4, 9, 9 };
     SDL_RenderRect(renderer, &r);
   }
-  SDL_RenderPoints(renderer, base_points, SDL_arraysize(base_points));
+  SDL_RenderPoints(renderer, base_points, NUM_BASE_POINTS);
 
   /* draw calculated points */
   SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
-  SDL_RenderLines(renderer, points, (int)npoints);
+  if (npoints >= 2)
+    SDL_RenderLines(renderer, points, npoints);
 
   /* put the newly-cleared rendering on the screen. */
   SDL_RenderPresent(renderer);
@@ -88,12 +103,12 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result)
 }
 
 /* apply lagrange interpolation to x using base_points */
-SDL_FPoint interpolate(float x)
+static SDL_FPoint interpolate(float x)
 {
   float y = 0.f, prod = 1.f;
-  for (int i = 0; i < SDL_arraysize(base_points); ++i)
+  for (int i = 0; i < NUM_BASE_POINTS; ++i)
   {
-    for (int j = 0; j < SDL_arraysize(base_points); ++j)
+    for (int j = 0; j < NUM_BASE_POINTS; ++j)
       if (j != i) /* skip same terms to avoid division by zero */
         prod *= (x - base_points[j].x) / (base_points[i].x - base_points[j].x);
 

@@ -7,6 +7,9 @@
 #define WINDOW_WIDTH  900
 #define WINDOW_HEIGHT 900
 
+/* how far the triangle turns for each pixel of horizontal mouse movement */
+#define DEGREES_PER_PIXEL 1.0f
+
 /* We will use this renderer to draw into this window every frame. */
 static SDL_Window* window = NULL;
 static SDL_Renderer* renderer = NULL;
@@ -18,11 +21,9 @@ static SDL_FPoint points[3] = {
 }; /* triangle points */
 static SDL_FPoint points_transformed[3];
 
-static SDL_FPoint mouse_delta;
-
 static float alpha = 0.f;
 
-static void rotate_triangle();
+static void rotate_triangle(void);
 
 /* This function runs once at startup. */
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
@@ -38,7 +39,10 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[])
     SDL_Log("Couldn't create window/renderer: %s", SDL_GetError());
     return SDL_APP_FAILURE;
   }
-  SDL_SetRenderLogicalPresentation(renderer, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_LOGICAL_PRESENTATION_DISABLED);
+  /* keep the 900x900 drawing area intact when the window is resized. */
+  SDL_SetRenderLogicalPresentation(renderer, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+
+  rotate_triangle();  /* so the transformed triangle is valid before the first mouse move */
 
   return SDL_APP_CONTINUE;  /* carry on with the program! */
 }
@@ -50,16 +54,11 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event)
     return SDL_APP_SUCCESS;  /* end the program, reporting success to the OS. */
   }
   if (event->type == SDL_EVENT_MOUSE_MOTION) {
-    SDL_GetRelativeMouseState(&mouse_delta.x, &mouse_delta.y);
+    /* turn by how far the mouse moved, not by how many events arrived. */
+    alpha -= event->motion.xrel * DEGREES_PER_PIXEL;
+    alpha = fmodf(alpha, 360.0f);
 
-    if (mouse_delta.x > 0)
-      --alpha;
-    else
-      ++alpha;
-    
     rotate_triangle();
-
-    SDL_LogInfo(0, "(%f, %f)", mouse_delta.x, mouse_delta.y);
   }
 
   return SDL_APP_CONTINUE;  /* carry on with the program! */
@@ -96,11 +95,27 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result)
   /* SDL will clean up the window/renderer for us. */
 }
 
-static void rotate_triangle()
+/* Rotate the triangle by alpha degrees about its own centroid. A rotation
+   matrix always turns about the origin, so the pivot has to be moved there
+   first and put back afterwards: translate(+p) * rotate(alpha) * translate(-p). */
+static void rotate_triangle(void)
 {
+  const float alpha_rad = alpha * (SDL_PI_F / 180.0f);
+  const float c = cosf(alpha_rad);
+  const float s = sinf(alpha_rad);
+
+  SDL_FPoint pivot = { 0.f, 0.f };
   for (int i = 0; i < 3; ++i) {
-    float alpha_rad = alpha * (SDL_PI_F / 180.0f);
-    points_transformed[i].x = points[i].x * cosf(alpha_rad) + points[i].y * sinf(alpha_rad);
-    points_transformed[i].y = points[i].y * cosf(alpha_rad) - points[i].x * sinf(alpha_rad);
+    pivot.x += points[i].x;
+    pivot.y += points[i].y;
+  }
+  pivot.x /= 3.f;
+  pivot.y /= 3.f;
+
+  for (int i = 0; i < 3; ++i) {
+    const float dx = points[i].x - pivot.x;
+    const float dy = points[i].y - pivot.y;
+    points_transformed[i].x = pivot.x + dx * c + dy * s;
+    points_transformed[i].y = pivot.y + dy * c - dx * s;
   }
 }
